@@ -163,3 +163,33 @@ WHERE date_added < (SELECT MAX(date_added) FROM netflix_db)
       WHERE n.title = netflix_db.title AND n.date_added > netflix_db.date_added
   )
 ORDER BY date_added DESC;
+
+
+
+--Find the Top 10 Actors Who Have Appeared in the Highest Number of Movies Produced in India.
+
+SELECT 
+	UNNEST(STRING_TO_ARRAY(casts, ',')) AS actors,
+	COUNT(*)
+FROM netflix_db
+WHERE country = 'India'
+GROUP BY actors
+Order BY count(*) DESc
+LIMIT 10;
+
+
+
+--Categorize Content Based on the Presence of 'Kill' and 'Violence' Keywords.
+
+SELECT 
+	category,
+	COUNT(*) AS content_count
+FROM (
+		SELECT
+			CASE
+				WHEN description ILIKE '%kill%' OR description ILIKE '%voilence%' THEN 'BAD'
+				ELSE 'Good'
+			END AS category
+		FROM netflix_db
+) AS categorized_content
+Group BY category;
