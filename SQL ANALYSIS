@@ -1,0 +1,165 @@
+--Identifying the no of movies and TV shows avalible in each region.
+
+
+SELECT type , COUNT(*) AS total_count
+from netflix_db
+GROUP BY type;
+
+SELECT country,
+	   type,
+	   COUNT(*) AS total_count
+FROM netflix_db
+WHERE country IS NOT NULL
+GROUP BY country , type
+ORDER BY country, total_count DESC;
+
+
+--Popular Genre Analysis - most popular genres by counting the titles in each genre
+
+SELECT listed_in AS genre,
+	   COUNT(*) AS title_count
+FROM Netflix_db
+GROUP BY listed_in
+ORDER BY title_count DESC;
+
+
+--Analyzing how many titles were added to netflix each year
+
+SELECT EXTRACT(YEAR FROM TO_DATE(date_added, 'Month DD, YYYY')) AS year_added, 
+       COUNT(*) AS total_titles_added
+FROM netflix_db
+WHERE date_added IS NOT NULL
+GROUP BY year_added
+ORDER BY year_added;
+
+
+--Find the most frequent actors or directors in Netflix content.
+
+--#directors
+SELECT director, COUNT(*) AS frequency
+FROM netflix_db
+WHERE director IS NOT NULL AND director != ''
+GROUP BY director
+ORDER BY frequency DESC
+LIMIT 10;
+
+--#actors
+
+WITH split_cast AS (
+    SELECT UNNEST(STRING_TO_ARRAY(casts, ', ')) AS actor
+    FROM netflix_db
+    WHERE casts IS NOT NULL AND casts != ''
+)
+SELECT actor, COUNT(*) AS frequency
+FROM split_cast
+GROUP BY actor
+ORDER BY frequency DESC
+LIMIT 10;
+
+
+--Content Distribution by Type : Calculate the proportion of movies versus TV shows available.
+
+SELECT 
+	type,
+	COUNT(*) AS total_count,
+	ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) AS Propotion_percentage
+FROM netflix_db
+WHERE type IN ('Movie' , 'TV Show')
+GROUP BY type
+ORDER BY total_count DESC;
+
+
+--Seasonal Content Release Trends : Determine the months or seasons when the most content is released.
+ --Realease by month
+
+SELECT 
+    TO_CHAR(TO_DATE("date_added" , 'Month DD, YYYY'), 'Month') AS release_month,
+	COUNT(*) as Content_count
+FROM netflix_db
+WHERE "date_added" IS NOT NULL
+GROUP BY release_month 
+ORDER BY content_count DESC;
+
+	--Release Analysis by Season
+
+SELECT 
+		CASE
+			WHEN EXTRACT(MONTH FROM TO_DATE("date_added" ,'Month DD , YYYY')) IN (12, 1, 2) THEN 'Winter'
+			WHEN EXTRACT(MONTH FROM TO_DATE("date_added" ,'Month DD , YYYY')) IN (3, 4, 5) THEN 'Spring'
+			WHEN EXTRACT(MONTH FROM TO_DATE("date_added" ,'Month DD , YYYY')) IN (6, 7, 8) THEN 'Summer'
+			WHEN EXTRACT(MONTH FROM TO_DATE("date_added" ,'Month DD , YYYY')) IN (9, 10 , 11) THEN 'Fall'
+		END AS season,
+		COUNT(*) AS content_count
+FROM netflix_db
+WHERE "date_added" IS NOT NULL
+GROUP BY season
+ORDER BY content_count DESC;
+
+
+--Age Group Suitability : Analyze the distribution of content ratings (e.g., PG, PG-13, R).
+
+SELECT
+	  rating,
+	  COUNT(*) AS content_count,
+	  ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER () , 2) AS propotion_percentage
+FROM netflix_db
+WHERE rating IS NOT NULL
+GROUP BY rating
+ORDER BY content_count DESC;
+
+
+--Longest-Running TV Shows : Identify TV shows with the highest number of seasons or episodes.
+
+SELECT 
+	  title,
+	  CAST(REGEXP_REPLACE(duration, '[^0-9]' , '' , 'g') AS INTEGER) AS seasons
+FROM netflix_db
+WHERE type = 'TV Show' AND duration IS NOT NULL
+ORDER BY seasons DESC
+LIMIT 10;
+--International Content Availability : Find countries contributing the highest number of titles to Netflix.
+
+SELECT 
+	country,
+	COUNT(*) AS title_count
+FROM netflix_db
+WHERE country IS NOT NULL
+GROUP BY country
+ORDER BY title_count DESC
+LIMIT 10;
+
+--Genre vs. Popularity : Determine which genres correlate most with high viewer ratings or popularity metrics.
+
+WITH split_genres AS (
+    SELECT 
+        UNNEST(STRING_TO_ARRAY(listed_in, ', ')) AS genre,
+        rating
+    FROM netflix_db
+    WHERE listed_in IS NOT NULL AND rating IS NOT NULL
+)
+SELECT 
+    genre,
+    COUNT(*) AS genre_count,
+    AVG(CASE 
+            WHEN rating = 'PG' THEN 1
+            WHEN rating = 'PG-13' THEN 2
+            WHEN rating = 'R' THEN 3
+            WHEN rating = 'TV-MA' THEN 4
+            ELSE 0
+        END) AS average_rating
+FROM split_genres
+GROUP BY genre
+ORDER BY average_rating DESC;
+
+
+--Expired Content Analysis : Identify titles removed from Netflix and analyze trends.
+
+SELECT title, date_added
+FROM netflix_db
+WHERE date_added < (SELECT MAX(date_added) FROM netflix_db)
+  AND NOT EXISTS (
+      SELECT 1
+      FROM netflix_db AS n
+      WHERE n.title = netflix_db.title AND n.date_added > netflix_db.date_added
+  )
+ORDER BY date_added DESC;
